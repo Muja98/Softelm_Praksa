@@ -290,4 +290,471 @@ namespace api.Services
                 return true;
             else return false;
         }
-       
+        public async Task<IEnumerable<Possession>> GetPossessionsAsync(int farmId)
+        {
+            var farm = _context.Farms.FirstOrDefault(farm354 => farm354.Id == farmId);
+            return await _context.Possessions.Where(possesion => possesion.Farm == farm).ToListAsync();
+        }
+        public async Task<Possession> GetPossessionAsync(int farmId, int possessionId)
+        {
+            var farm = await _context.Farms.FirstOrDefaultAsync(farm354 => farm354.Id == farmId);
+            return await _context.Possessions.Where(possession => possession.Farm == farm && possession.Id == possessionId).FirstOrDefaultAsync();//.Include(season=>season.Seasons).ThenInclude(events=>events.SeasonEvents).FirstOrDefaultAsync();
+        }
+        public async Task<GetPossessionExtraDataDto> GetPossessionExtraDataAsync(int farmId, int possessionId)
+        {
+            var farm = await _context.Farms.FirstOrDefaultAsync(farm354 => farm354.Id == farmId);
+            var possession = await _context.Possessions.Where(possession354 => possession354.Farm == farm && possession354.Id == possessionId).Include(season => season.Seasons).ThenInclude(events => events.SeasonEvents).FirstOrDefaultAsync();
+            var openSeason = await _context.Seasons.Where(season => season.Possession == possession && season.State == true).FirstOrDefaultAsync();
+
+            List<SeasonEvent> seasonEvents = (List<SeasonEvent>)openSeason.SeasonEvents;
+            var lastSeasonEvent = new SeasonEvent();
+            var getLastSeasonevent = new GetSeasonEventDto();
+            if (openSeason.SeasonEvents.Count == 0)
+            {
+                getLastSeasonevent = null;
+            }
+            else
+            {
+                lastSeasonEvent = seasonEvents[openSeason.SeasonEvents.Count - 1];
+                getLastSeasonevent = _mapper.Map<GetSeasonEventDto>(lastSeasonEvent);
+            }
+            var getOpenSeason = _mapper.Map<GetSeasonDto>(openSeason);
+
+            GetPossessionExtraDataDto possessionExtraData = new GetPossessionExtraDataDto();
+            possessionExtraData.Id = possession.Id;
+            possessionExtraData.Name = possession.Name;
+            possessionExtraData.Location = possession.Location;
+            possessionExtraData.Lat = possession.Lat;
+            possessionExtraData.Lng = possession.Lng;
+            possessionExtraData.OpenSeason = getOpenSeason;
+            possessionExtraData.LastSeasonEvent = getLastSeasonevent;
+
+            return possessionExtraData;
+        }
+        public async Task<ICollection<Object>> GetCoupleExtraData(int from, int to, int farmId)
+        {
+            var farm = await _context.Farms.FirstOrDefaultAsync(farm354 => farm354.Id == farmId);
+            var possessions = await _context.Possessions.Where(possession => possession.Farm == farm).Include(season => season.Seasons).ThenInclude(events => events.SeasonEvents).ToListAsync();
+            List<Object> possessionsToReturn = new List<Object>();
+            List<Object> couplePossessionsToReturn = new List<Object>();
+            List<Season> openSeasons = new List<Season>();
+            List<GetSeasonEventDto> lastEvents = new List<GetSeasonEventDto>();
+            for (int i = 0; i < possessions.Count; i++)
+            {
+                var openSeason = await _context.Seasons.Where(season => season.Possession == possessions[i] && season.State == true).Include(events => events.SeasonEvents).FirstOrDefaultAsync();
+                openSeasons.Add(openSeason);
+            }
+            for (int i = 0; i < possessions.Count; i++)
+            {
+                if (openSeasons[i] != null && openSeasons[i].SeasonEvents.Count > 0)
+                {
+                    lastEvents.Add(_mapper.Map<GetSeasonEventDto>(openSeasons[i].SeasonEvents.Last()));
+                }
+                else
+                {
+                    lastEvents.Add(null);
+                }
+            }
+            for (int i = 0; i < possessions.Count; i++)
+            {
+                if (openSeasons[i] == null)
+                {
+                    GetPossessionDto getPossession = _mapper.Map<GetPossessionDto>(possessions[i]);
+                    possessionsToReturn.Add(getPossession);
+                }
+                else
+                {
+                    GetPossessionExtraDataDto getPossessionExtraDataDto = new GetPossessionExtraDataDto();
+                    getPossessionExtraDataDto.Id = possessions[i].Id;
+                    getPossessionExtraDataDto.Name = possessions[i].Name;
+                    getPossessionExtraDataDto.Location = possessions[i].Location;
+                    getPossessionExtraDataDto.Lat = possessions[i].Lat;
+                    getPossessionExtraDataDto.Lng = possessions[i].Lng;
+                    getPossessionExtraDataDto.OpenSeason = _mapper.Map<GetSeasonDto>(openSeasons[i]);
+                    getPossessionExtraDataDto.LastSeasonEvent = lastEvents[i];
+                    possessionsToReturn.Add(getPossessionExtraDataDto);
+                }
+            }
+            if (possessions.Count > 0)
+            {
+                for (int i = from; i <= to; i++)
+                {
+                    couplePossessionsToReturn.Add(possessionsToReturn[i]);
+                }
+            }
+            return couplePossessionsToReturn;
+        }
+        public async Task<ICollection<Object>> GetPossessionsExtraData(int farmId)
+        {
+            var farm = await _context.Farms.FirstOrDefaultAsync(farm354 => farm354.Id == farmId);
+            var possessions = await _context.Possessions.Where(possession => possession.Farm == farm).Include(season => season.Seasons).ThenInclude(events => events.SeasonEvents).ToListAsync();
+            List<Object> possessionsToReturn = new List<Object>();
+            List<Season> openSeasons = new List<Season>();
+            List<GetSeasonEventDto> lastEvents = new List<GetSeasonEventDto>();
+            for (int i = 0; i < possessions.Count; i++)
+            {
+                var openSeason = await _context.Seasons.Where(season => season.Possession == possessions[i] && season.State == true).Include(events => events.SeasonEvents).FirstOrDefaultAsync();
+                openSeasons.Add(openSeason);
+            }
+            for (int i = 0; i < possessions.Count; i++)
+            {
+                if (openSeasons[i] != null && openSeasons[i].SeasonEvents.Count > 0)
+                {
+                    lastEvents.Add(_mapper.Map<GetSeasonEventDto>(openSeasons[i].SeasonEvents.Last()));
+                }
+                else
+                {
+                    lastEvents.Add(null);
+                }
+            }
+            for (int i = 0; i < possessions.Count; i++)
+            {
+                if (openSeasons[i] == null)
+                {
+                    GetPossessionDto getPossession = _mapper.Map<GetPossessionDto>(possessions[i]);
+                    possessionsToReturn.Add(getPossession);
+                }
+                else
+                {
+                    GetPossessionExtraDataDto getPossessionExtraDataDto = new GetPossessionExtraDataDto();
+                    getPossessionExtraDataDto.Id = possessions[i].Id;
+                    getPossessionExtraDataDto.Name = possessions[i].Name;
+                    getPossessionExtraDataDto.Location = possessions[i].Location;
+                    getPossessionExtraDataDto.Lat = possessions[i].Lat;
+                    getPossessionExtraDataDto.Lng = possessions[i].Lng;
+                    getPossessionExtraDataDto.OpenSeason = _mapper.Map<GetSeasonDto>(openSeasons[i]);
+                    getPossessionExtraDataDto.LastSeasonEvent = lastEvents[i];
+                    possessionsToReturn.Add(getPossessionExtraDataDto);
+                }
+            }
+            return possessionsToReturn;
+        }
+        public void AddPossession(int farmId, Possession possession)
+        {
+            var farm = _context.Farms.FirstOrDefault(farm354 => farm354.Id == farmId);
+            possession.Farm = farm;
+            _context.Possessions.AddAsync(possession);
+        }
+        public void DeletePossession(Possession possession)
+        {
+            if (possession == null)
+                throw new ArgumentNullException(nameof(possession));
+            var possessionForDelete = _context.Possessions.Where(possession354 => possession354.Id == possession.Id).Include(possession354 => possession354.Seasons).FirstOrDefault();
+            foreach (var season in possessionForDelete.Seasons)
+            {
+                this.DeleteSeason(season);
+            }
+            _context.Possessions.Remove(possession);
+        }
+        public async Task<int> NumberOf(int farmId)
+        {
+            var farm = await _context.Farms.FirstOrDefaultAsync(farm354 => farm354.Id == farmId);
+            var numberOfPossessions = await _context.Possessions.CountAsync(possession => possession.Farm == farm);
+            return numberOfPossessions;
+
+        }
+        public async Task<IEnumerable<Possession>> GetCouple(int from, int to, int farmId)
+        {
+            var farm = await _context.Farms.FirstOrDefaultAsync(farm354 => farm354.Id == farmId);
+            var possessions = await _context.Possessions.Where(possession => possession.Farm == farm).ToListAsync();
+            var possessionsToReturn = new List<Possession>();
+            if (possessions.Count > 0)
+            {
+                for (int i = from; i <= to; i++)
+                {
+                    possessionsToReturn.Add(possessions[i]);
+                }
+            }
+            return possessionsToReturn;
+        }
+
+        public async Task<IEnumerable<Product>> GetProductsAsync(int farmId)
+        {
+            var farm = _context.Farms.FirstOrDefault(f => f.Id == farmId);
+            return await _context.Products.Where(p => p.Farm == farm).Include(p => p.Type).Include(p => p.Farm).ToListAsync();
+        }
+        public bool ProductExist(int farmId, int productId)
+        {
+            var farm = _context.Farms.FirstOrDefault(f => f.Id == farmId);
+            return _context.Products.Any(p => p.Farm == farm && p.Id == productId);
+        }
+        public bool ProductExist(int farmId, string productName)
+        {
+            var farm = _context.Farms.FirstOrDefault(f => f.Id == farmId);
+            return _context.Products.Any(p => p.Farm == farm && p.Name == productName);
+        }
+        public bool ProductExist(int productId)
+        {
+            var product = _context.Products.FirstOrDefault(product354 => product354.Id == productId);
+            if (product != null)
+                return true;
+            else
+                return false;
+        }
+        public void PostPictureForProduct(Product product, IFormFile picture)
+        {
+            //  using (var binaryReader= new BinaryReader(picture.OpenReadStream()))
+            // {
+            //     product.Image = binaryReader.ReadBytes((int)picture.Length);
+            // }
+            // if(picture != null && picture.Length > 0)
+            // {
+            //     using(var memoryStream = new MemoryStream())
+            //     {
+            //         picture.CopyTo(memoryStream);
+            //         using(var img = Image)
+            //         {
+
+            //         }
+            //     }
+            // }
+            using var image = Image.Load(picture.OpenReadStream());
+            image.Mutate(x => x.Resize(240, 170));
+            var encoder = new JpegEncoder();
+            using(var memoryStream = new MemoryStream())
+            {
+                image.Save(memoryStream,encoder);
+                product.Image = memoryStream.ToArray();
+            }
+        }
+
+        // public void AddProduct(int farmId, Product product,string type,IFormFile picture)
+        // {
+        //     var farm = _context.Farms.FirstOrDefault(f => f.Id == farmId);
+        //     var productType=_context.ProductTypes.FirstOrDefault(product=>product.Type==type);
+        //     product.Farm = farm;
+        //     product.Type=productType;
+        //     using (var binaryReader= new BinaryReader(picture.OpenReadStream()))
+        //     {
+        //         product.Image=binaryReader.ReadBytes((int)picture.Length);
+        //     }
+        //     _context.Products.Add(product);
+        // }
+
+        public async Task<Product> AddProductWithoutPicture(int farmId, Product product, string type)
+        {
+            var farm = _context.Farms.FirstOrDefault(farm354 => farm354.Id == farmId);
+            var productType = _context.ProductTypes.FirstOrDefault(productType354 => productType354.Type == type);
+            product.Farm = farm;
+            product.Type = productType;
+            product.Image = null;
+            await _context.Products.AddAsync(product);
+            _context.Products.FirstOrDefault(product354 => product354 == product);
+            return product;
+        }
+
+        public async Task<Product> GetProductAsync(int farmId, int productId)
+        {
+            var farm = await _context.Farms.FirstOrDefaultAsync(f => f.Id == farmId);
+            return _context.Products.Where(p => p.Id == productId && p.Farm == farm).Include(p => p.Type).FirstOrDefault();
+        }
+
+        public async Task<Product> GetLastAddedProduct(int farmId, string type)
+        {
+            var farm = await _context.Farms.FirstOrDefaultAsync(farm354 => farm354.Id == farmId);
+            var productType = await _context.ProductTypes.FirstOrDefaultAsync(productType354 => productType354.Type == type);
+            var products = await _context.Products.Where(product => product.Farm == farm && product.Type == productType).ToListAsync();
+            return products.Last();
+
+        }
+
+        public async Task<Product> GetProductAsync(int productId)
+        {
+            return await _context.Products.FirstOrDefaultAsync(product354 => product354.Id == productId);
+        }
+
+        public async Task<Product> GetProductAsync(int farmId, string productName)
+        {
+            var farm = await _context.Farms.FirstOrDefaultAsync(f => f.Id == farmId);
+            var list = _context.Products.Where(p => p.Name == productName && p.Farm == farm).FirstOrDefault();
+
+            return list;
+        }
+
+        public async Task<IEnumerable<Product>> GetProductsAsync(int farmId, string productName)
+        {
+            var farm = await _context.Farms.FirstOrDefaultAsync(f => f.Id == farmId);
+            return await _context.Products.Where(p => p.Farm == farm && p.Name.Contains(productName)).Include(p => p.Farm).ToListAsync();
+
+        }
+
+        public void DeleteTypeOfAnimal(TypeOfAnimal typeOfAnimal)
+        {
+            if (typeOfAnimal == null)
+                throw new ArgumentException(nameof(typeOfAnimal));
+
+            _context.TypesOfAnimalEvents.RemoveRange(_context.TypesOfAnimalEvents.Where(t => t.TypeOfAnimal == typeOfAnimal).ToList());
+
+            foreach (var animal in _context.Animals.Where(a => a.TypeOfAnimal == typeOfAnimal).ToList())
+            {
+                this.DeleteAnimal(animal);
+            }
+
+            _context.TypesOfAnimal.Remove(typeOfAnimal);
+        }
+
+        public void DeleteProduct(Product product)
+        {
+            if (product == null)
+                throw new ArgumentException(nameof(product));
+
+            // _context.RemoveRange(_context.Transactions.Where(t => t.Product == product).ToList());
+
+            IEnumerable<Transaction> transactions = _context.Transactions.Where(t => t.Product == product).ToList();
+
+            foreach (var transaction in transactions)
+            {
+                transaction.Product = null;
+                product.Transactions.Remove(transaction);
+            }
+
+            IEnumerable<AnimalEvent> animalEvents = _context.AnimalEvents.Where(a => a.Product == product).ToList();
+
+            foreach (var animalEvent in animalEvents)
+            {
+                animalEvent.Product = null;
+                product.AnimalEvents.Remove(animalEvent);
+            }
+
+            IEnumerable<TypeOfAnimalEvent> typeOfAnimalEvents = _context.TypesOfAnimalEvents.Where(t => t.Product == product).ToList();
+
+            foreach (var typeOfAnimalEvent in typeOfAnimalEvents)
+            {
+                typeOfAnimalEvent.Product = null;
+                product.TypeOfAnimalEvents.Remove(typeOfAnimalEvent);
+            }
+
+            IEnumerable<SeasonEvent> seasonEvents = _context.SeasonEvents.Where(s => s.ForProduct == product).ToList();
+
+            foreach (var seasonEvent in seasonEvents)
+            {
+                seasonEvent.ForProduct = null;
+                product.SeasonEvents.Remove(seasonEvent);
+            }
+
+            _context.Judgements.RemoveRange(_context.Judgements.Where(j => j.Product == product).ToList());
+
+            _context.Products.Remove(product);
+        }
+
+        public async Task<IEnumerable<TypeOfAnimalEvent>> GetTypeOfAnimalEventsAsync(int farmId, int typeOfAnimalId)
+        {
+            var farm = await _context.Farms.FirstOrDefaultAsync(f => f.Id == farmId);
+            var typeOfAnimal = await _context.TypesOfAnimal.Where(t => t.Farm == farm && t.Id == typeOfAnimalId).FirstOrDefaultAsync();
+
+            return await _context.TypesOfAnimalEvents.Where(t => t.TypeOfAnimal == typeOfAnimal).ToListAsync();
+        }
+
+        public bool SeasonExist(int seasonId)
+        {
+            var season = _context.Seasons.FirstOrDefault(season354 => season354.Id == seasonId);
+            if (season != null)
+                return true;
+            else return false;
+        }
+
+        public bool SeasonExist(int possessionId, int seasonId)
+        {
+            var possession = _context.Possessions.FirstOrDefault(possession354 => possession354.Id == possessionId);
+            var season = _context.Seasons.Where(season354 => season354.Id == seasonId && season354.Possession == possession).FirstOrDefault();
+            if (season != null)
+                return true;
+            else return false;
+
+        }
+
+        public async Task<IEnumerable<Season>> GetSeasonsAsync(int possessionId)
+        {
+            var possession = _context.Possessions.FirstOrDefault(possession354 => possession354.Id == possessionId);
+            return await _context.Seasons.Where(season => season.Possession == possession).ToListAsync();
+        }
+        public async Task<Season> GetSeasonAsync(int possessionId, int seasonId)
+        {
+            var possession = _context.Possessions.FirstOrDefault(possesion354 => possesion354.Id == possessionId);
+            return await _context.Seasons.Where(season354 => season354.Possession == possession && season354.Id == seasonId).FirstOrDefaultAsync();
+
+        }
+        public bool OpenSeasonExistForPossession(int possessionId)
+        {
+            var possession = _context.Possessions.FirstOrDefault(possession354 => possession354.Id == possessionId);
+            return _context.Seasons.Any(season => season.Possession == possession && season.State == true);
+        }
+        // public async Task<Season> GetOpenSeason(int possessionId)
+        // {
+        //     var possession=await _context.Possessions.FirstOrDefaultAsync(possession354=>possession354.Id==possessionId);
+        //     return await _context.Seasons.Where(season=> season.Possession==possession && season.State==true).FirstOrDefaultAsync();
+        // }
+        public void AddSeason(int possessionId, Season season)
+        {
+            var possession = _context.Possessions.FirstOrDefault(possession354 => possession354.Id == possessionId);
+            season.Possession = possession;
+            _context.Seasons.AddAsync(season);
+        }
+        public void DeleteSeason(Season season)
+        {
+            if (season == null)
+                throw new ArgumentNullException(nameof(season));
+            var seasonForDelete = _context.Seasons.Where(season354 => season354.Id == season.Id).Include(season354 => season354.SeasonEvents).FirstOrDefault();
+            _context.SeasonEvents.RemoveRange(seasonForDelete.SeasonEvents);
+            _context.Seasons.Remove(season);
+        }
+        public bool SeasonEventExist(int seasonEventId)
+        {
+            var seasonEvent = _context.SeasonEvents.FirstOrDefault(seasonEvent354 => seasonEvent354.Id == seasonEventId);
+            if (seasonEvent != null)
+                return true;
+            else return false;
+        }
+
+        public bool SeasonEventExist(int seasonId, int seasonEventId)
+        {
+            var season = _context.Seasons.FirstOrDefault(season354 => season354.Id == seasonId);
+            var seasonEvent = _context.SeasonEvents.Where(seasonEvent354 => seasonEvent354.Id == seasonEventId && seasonEvent354.Season == season)
+                                                    .Include(seasonEvent => seasonEvent.ForProduct).FirstOrDefault();
+
+            if (seasonEvent != null)
+                return true;
+            else return false;
+        }
+        public async Task<IEnumerable<SeasonEvent>> GetSeasonEventsAsync(int seasonId)
+        {
+            var season = _context.Seasons.FirstOrDefault(sesaon354 => sesaon354.Id == seasonId);
+            return await _context.SeasonEvents.Where(seasonEvent => seasonEvent.Season == season)
+                                            .Include(seasonEvent => seasonEvent.ForProduct).ToListAsync();
+        }
+        public async Task<SeasonEvent> GetSeasonEventAsync(int seasonId, int seasonEventId)
+        {
+            var season = _context.Seasons.FirstOrDefault(season354 => season354.Id == seasonId);
+            return await _context.SeasonEvents.Where(seasonEvent => seasonEvent.Season == season && seasonEvent.Id == seasonEventId).FirstOrDefaultAsync();
+        }
+
+        public void AddSeasonEvent(int seasonId, SeasonEvent seasonEvent)
+        {
+            var season = _context.Seasons.FirstOrDefault(season354 => season354.Id == seasonId);
+            seasonEvent.Season = season;
+            _context.SeasonEvents.AddAsync(seasonEvent);
+        }
+        public void AddTypeOfAnimalEvent(int farmId, int typeOfAnimalId, TypeOfAnimalEvent typeOfAnimalEvent, int productId)
+        {
+            var farm = _context.Farms.FirstOrDefault(f => f.Id == farmId);
+            var typeOfAnimal = _context.TypesOfAnimal.Where(t => t.Farm == farm && t.Id == typeOfAnimalId).FirstOrDefault();
+            typeOfAnimalEvent.TypeOfAnimal = typeOfAnimal;
+
+            if (productId > 0)
+            {
+                var product = _context.Products.FirstOrDefault(p => p.Id == productId);
+                typeOfAnimalEvent.Product = product;
+                product.InStock += (int)typeOfAnimalEvent.Contribution;
+            }
+            else typeOfAnimalEvent.Product = null;
+
+            _context.TypesOfAnimalEvents.Add(typeOfAnimalEvent);
+        }
+
+        public bool TypeOfAnimalEventExsists(int farmId, int typeOfAnimalId, int eventId)
+        {
+            var farm = _context.Farms.FirstOrDefault(f => f.Id == farmId);
+            var typeOfAnimal = _context.TypesOfAnimal.Where(t => t.Farm == farm && t.Id == typeOfAnimalId).FirstOrDefault();
+
+            return _context.TypesOfAnimalEvents.Any(t => t.TypeOfAnimal == typeOfAnimal && t.Id == eventId);
+        }
